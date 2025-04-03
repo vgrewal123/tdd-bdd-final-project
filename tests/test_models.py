@@ -30,6 +30,8 @@ from decimal import Decimal
 from service.models import Product, Category, db
 from service import app
 from tests.factories import ProductFactory
+from service.models import Product, Category, db, DataValidationError
+
 
 DATABASE_URI = os.getenv(
     "DATABASE_URI", "postgresql://postgres:postgres@localhost:5432/postgres"
@@ -192,3 +194,52 @@ class TestProductModel(unittest.TestCase):
         self.assertEqual(found.count(), count)
         for product in found:
             self.assertEqual(product.category, category)
+
+    def test_repr_returns_expected_string(self):
+        product = ProductFactory()
+        expected = f"<Product {product.name} id=[{product.id}]>"
+        self.assertEqual(repr(product), expected)
+    
+    def test_deserialize_missing_name(self):
+        product = Product()
+        data = {
+            # "name": "Missing",  # Omitted on purpose
+            "description": "No name here",
+            "price": "10.99",
+            "available": True,
+            "category": "FOOD"
+        }
+        with self.assertRaises(DataValidationError):
+            product.deserialize(data)
+
+    def test_deserialize_invalid_boolean(self):
+        product = Product()
+        data = {
+            "name": "Bad Bool",
+            "description": "Oops",
+            "price": "9.99",
+            "available": "yes",  # should be boolean
+            "category": "FOOD"
+        }
+        with self.assertRaises(DataValidationError):
+            product.deserialize(data)
+    
+    def test_deserialize_invalid_category(self):
+        product = Product()
+        data = {
+            "name": "Bad Category",
+            "description": "Invalid cat",
+            "price": "15.00",
+            "available": True,
+            "category": "MAGIC"  # not in enum
+        }
+        with self.assertRaises(DataValidationError):
+            product.deserialize(data)
+
+    def test_deserialize_with_none(self):
+        product = Product()
+        with self.assertRaises(DataValidationError):
+            product.deserialize(None)
+
+
+
